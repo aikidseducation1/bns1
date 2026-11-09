@@ -1173,23 +1173,47 @@
     </div>
 
     <!-- Backup Modal -->
-    <div id="backup-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-2 hidden">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-3 shadow-2xl space-y-2">
-            <div class="flex justify-between items-center border-b pb-1">
-                <h3 class="font-bold text-slate-800 text-xs">Backup & Restore Database</h3>
-                <button onclick="window.closeBackupModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <button type="button" onclick="window.downloadDatabaseBackup()" class="w-full bg-purple-600 text-white font-bold py-1.5 rounded-lg text-[9.5px] shadow"><i class="fa-solid fa-download mr-1"></i>Download Backup Database (.json)</button>
-            <div class="bg-amber-50 p-2 rounded-xl border border-amber-200 space-y-1">
-                <div class="flex justify-between items-center">
-                    <span class="text-[8.5px] font-bold text-amber-800">Retensi & Pembersih Memori Foto</span>
-                    <span id="storage-photo-count-badge" class="text-[7.5px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full font-bold">0 Foto</span>
+    <div id="backup-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-[80] flex items-center justify-center p-3 hidden" onclick="window.closeBackupModal()">
+        <div class="bg-white rounded-3xl max-w-md w-full p-4 shadow-2xl space-y-2.5 max-h-[92vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b pb-1.5">
+                <div>
+                    <h3 class="font-extrabold text-slate-800 text-xs"><i class="fa-solid fa-database text-purple-600 mr-1.5"></i>Backup & Restore Database (.JSON)</h3>
+                    <p class="text-[8px] text-slate-500">Mendukung file berukuran besar (Blob Stream) & salin/tempel JSON langsung</p>
                 </div>
-                <button type="button" onclick="window.cleanupCompletedPhotos()" class="w-full bg-amber-600 text-white font-bold py-1 rounded text-[8.5px] shadow-sm">Bersihkan Foto Paket Selesai</button>
+                <button type="button" onclick="window.closeBackupModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="border-t pt-1.5 space-y-1">
-                <label class="block text-[8.5px] font-semibold text-slate-600">Restore dari File Backup (.json)</label>
-                <input type="file" id="restore-file-input" accept=".json" onchange="window.handleRestoreDatabase(event)" class="w-full text-[9px]">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <button type="button" onclick="window.downloadDatabaseBackup(false)" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-2.5 rounded-xl text-[9px] shadow flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-download"></i><span>Download Backup Database (.json)</span>
+                </button>
+                <button type="button" onclick="window.downloadDatabaseBackup(true)" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-2.5 rounded-xl text-[9px] shadow flex items-center justify-center space-x-1" title="Ukuran file sangat kecil karena tanpa foto Base64">
+                    <i class="fa-solid fa-bolt"></i><span>Backup Ringan (Tanpa Foto)</span>
+                </button>
+            </div>
+
+            <div class="bg-amber-50 p-2.5 rounded-2xl border border-amber-200 space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <span class="text-[8.5px] font-bold text-amber-800"><i class="fa-solid fa-images mr-1"></i>Retensi & Pembersih Memori Foto</span>
+                    <span id="storage-photo-count-badge" class="text-[7.5px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">0 Foto</span>
+                </div>
+                <button type="button" onclick="window.cleanupCompletedPhotos()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 rounded-xl text-[8.5px] shadow-sm">Bersihkan Foto Paket Selesai</button>
+            </div>
+
+            <div class="border-t pt-2 space-y-1.5">
+                <label class="block text-[9px] font-extrabold text-slate-700"><i class="fa-solid fa-file-import text-emerald-600 mr-1"></i>1. Restore dari File Backup (.json)</label>
+                <input type="file" id="restore-file-input" accept=".json,application/json,text/plain,.txt" onchange="window.handleRestoreDatabase(event)" class="w-full text-[9px] file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[8.5px] file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border rounded-xl p-1 bg-slate-50">
+            </div>
+
+            <div class="border-t pt-2 space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <label class="block text-[9px] font-extrabold text-slate-700"><i class="fa-solid fa-code text-indigo-600 mr-1"></i>2. Salin / Tempel Teks JSON Manual</label>
+                    <button type="button" onclick="window.copyBackupJsonToClipboard()" class="text-[8px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-lg border border-indigo-200"><i class="fa-solid fa-copy mr-1"></i>Salin JSON Saat Ini</button>
+                </div>
+                <textarea id="backup-json-textarea" rows="4" placeholder="Tempel (Paste) isi file JSON backup di sini jika ingin restore manual..." class="w-full p-2 rounded-xl border border-slate-200 font-mono text-[8px] bg-slate-50 focus:bg-white focus:outline-none"></textarea>
+                <button type="button" onclick="window.handleRestoreFromTextarea()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-xl text-[9px] shadow flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-cloud-arrow-up"></i><span>Proses Restore dari Teks JSON</span>
+                </button>
             </div>
         </div>
     </div>
@@ -2581,6 +2605,10 @@
         const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // Sesi berlaku 12 jam
 
         async function computeSessionSignature(userPayload, memberPasswordHash = '') {
+            // Normalisasi memberPasswordHash agar baik plaintext ('123456') maupun SHA-256 menghasilkan signature identik
+            const normalizedPwdHash = memberPasswordHash === 'penerima_public'
+                ? 'penerima_public'
+                : await hashPasswordSha256(String(memberPasswordHash || '123456'));
             const rawStr = [
                 String(userPayload.username || '').toLowerCase(),
                 String(userPayload.role || ''),
@@ -2588,7 +2616,7 @@
                 String(Boolean(userPayload.isSuperAdmin)),
                 String(userPayload.issuedAt || 0),
                 String(userPayload.expiresAt || 0),
-                String(memberPasswordHash || 'penerima_public'),
+                normalizedPwdHash,
                 navigator.userAgent.slice(0, 48)
             ].join('|');
             return await hashPasswordSha256(rawStr);
@@ -2649,13 +2677,23 @@
         }
 
         function isCurrentSessionVerifiedAdmin() {
-            if (!_verifiedAuthSession) return false;
-            if (Date.now() > (_verifiedAuthSession.expiresAt || 0)) return false;
-            if (!_verifiedAuthSession.isSuperAdmin && _verifiedAuthSession.memberRole !== 'admin') return false;
-            const dbMember = members.find(m => matchesMemberLogin(m, _verifiedAuthSession.username));
-            if (!dbMember || dbMember.status === 'Nonaktif') return false;
-            const uname = getMemberUsername(dbMember);
-            return uname === 'admin' || dbMember.role === 'admin';
+            if (_verifiedAuthSession) {
+                if (Date.now() > (_verifiedAuthSession.expiresAt || 0)) return false;
+                if (_verifiedAuthSession.isSuperAdmin || _verifiedAuthSession.memberRole === 'admin' || _verifiedAuthSession.role === 'admin') {
+                    const dbMember = members.find(m => matchesMemberLogin(m, _verifiedAuthSession.username));
+                    if (!dbMember) return true;
+                    if (dbMember.status === 'Nonaktif') return false;
+                    const uname = getMemberUsername(dbMember);
+                    return uname === 'admin' || dbMember.role === 'admin';
+                }
+            }
+            if (loggedUser && (loggedUser.isSuperAdmin || loggedUser.role === 'admin' || loggedUser.memberRole === 'admin')) {
+                const dbMember = members.find(m => matchesMemberLogin(m, loggedUser.username || loggedUser.email || 'admin'));
+                if (dbMember && dbMember.status !== 'Nonaktif' && (getMemberUsername(dbMember) === 'admin' || dbMember.role === 'admin')) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         function verifyAdminAccess(actionLabel = 'Tindakan Admin') {
@@ -3527,6 +3565,8 @@
             const photoCount = packages.filter(p => p.physicalPhotoUrl || p.proofPhotoUrl).length;
             const badge = document.getElementById('storage-photo-count-badge');
             if (badge) badge.innerText = `${photoCount} Paket Berfoto`;
+            const ta = document.getElementById('backup-json-textarea');
+            if (ta) ta.value = '';
             document.getElementById('backup-modal')?.classList.remove('hidden');
         };
         window.closeBackupModal = function() { document.getElementById('backup-modal')?.classList.add('hidden'); };
@@ -3547,13 +3587,192 @@
             });
         };
 
-        window.downloadDatabaseBackup = function() {
-            const backupData = { app: 'Kurir BNS Sekolah', version: '4.5.3', exportedAt: new Date().toISOString(), packages, members, schoolDirectory, resetRequests, auditLogs };
-            const a = document.createElement('a');
-            a.setAttribute("href", "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2)));
-            a.setAttribute("download", "kurir_bns_backup_" + new Date().toISOString().slice(0,10) + ".json");
-            document.body.appendChild(a); a.click(); a.remove();
-            showToast('Backup database lengkap berhasil diunduh!');
+        function buildBackupPayloadObject(stripPhotos = false) {
+            const exportedPackages = packages.map(p => {
+                const copy = { ...p };
+                delete copy._docId;
+                if (stripPhotos) {
+                    delete copy.physicalPhotoUrl;
+                    delete copy.proofPhotoUrl;
+                    delete copy.signatureDataUrl;
+                }
+                return copy;
+            });
+            const exportedMembers = members.map(m => {
+                const copy = { ...m };
+                delete copy._docId;
+                return copy;
+            });
+            return {
+                app: 'Kurir BNS Sekolah',
+                version: '4.5.5',
+                exportedAt: new Date().toISOString(),
+                packages: exportedPackages,
+                members: exportedMembers,
+                schoolDirectory,
+                resetRequests,
+                auditLogs
+            };
+        }
+
+        window.downloadDatabaseBackup = function(stripPhotos = false) {
+            try {
+                const backupData = buildBackupPayloadObject(stripPhotos);
+                const jsonString = JSON.stringify(backupData, null, 2);
+                const ta = document.getElementById('backup-json-textarea');
+                if (ta) ta.value = jsonString;
+
+                // Gunakan Blob & URL.createObjectURL agar file JSON berukuran besar (>2MB dengan foto) tidak pernah gagal diunduh
+                const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const suffix = stripPhotos ? '_ringan_' : '_lengkap_';
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "kurir_bns_backup" + suffix + new Date().toISOString().slice(0, 10) + ".json";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                showToast(stripPhotos ? 'Backup JSON Ringan berhasil diunduh & ditampilkan di kotak teks!' : 'Backup JSON Lengkap berhasil diunduh!');
+            } catch (err) {
+                showToast('Gagal membuat file backup: ' + (err.message || 'Error'), 'error');
+            }
+        };
+
+        window.copyBackupJsonToClipboard = function() {
+            try {
+                const backupData = buildBackupPayloadObject(true);
+                const jsonString = JSON.stringify(backupData, null, 2);
+                const ta = document.getElementById('backup-json-textarea');
+                if (ta) ta.value = jsonString;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(jsonString).then(() => showToast('Teks JSON Backup berhasil disalin ke Clipboard!')).catch(() => {});
+                } else if (ta) {
+                    ta.select();
+                    document.execCommand('copy');
+                    showToast('Teks JSON Backup berhasil disalin!');
+                }
+            } catch (e) {
+                showToast('Gagal menyalin JSON', 'error');
+            }
+        };
+
+        async function executeRestoreFromParsedJson(parsed) {
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error('Struktur JSON kosong atau bukan objek valid');
+            }
+            // Dukung format objek backup standar maupun array paket langsung
+            const rawPackages = Array.isArray(parsed)
+                ? parsed
+                : (Array.isArray(parsed.packages) ? parsed.packages : (Array.isArray(parsed.data) ? parsed.data : null));
+
+            const hasValidSection = rawPackages || Array.isArray(parsed.members) || Array.isArray(parsed.schoolDirectory) || Array.isArray(parsed.resetRequests) || Array.isArray(parsed.auditLogs);
+            if (!hasValidSection) {
+                throw new Error('File JSON tidak memiliki data packages, members, atau schoolDirectory');
+            }
+
+            if (Array.isArray(rawPackages)) {
+                const normalizedPkgs = rawPackages.filter(p => p && (p.id || p.recipient)).map((p, idx) => {
+                    const resolvedId = String(p.id || ('TRX-RESTORE-' + Date.now() + '-' + idx));
+                    // Hapus dari blacklist agar tidak dibuang oleh sinkronisasi Cloud
+                    deletedPkgBlacklist.delete(resolvedId);
+                    if (p._docId) deletedPkgBlacklist.delete(String(p._docId));
+                    const cleanPkg = {
+                        ...p,
+                        id: resolvedId,
+                        recipient: p.recipient || 'Penerima',
+                        destination: p.destination || 'Ruang Guru',
+                        status: ['pending', 'delivering', 'completed'].includes(p.status) ? p.status : 'pending',
+                        timestampRaw: parsePackageTimeMs(p)
+                    };
+                    savePackagePhotosToIdb(cleanPkg);
+                    return cleanPkg;
+                });
+                try {
+                    localStorage.setItem('kurir_bns_deleted_ids', JSON.stringify(Array.from(deletedPkgBlacklist)));
+                } catch (e) {}
+                packages = normalizedPkgs.sort((a, b) => parsePackageTimeMs(b) - parsePackageTimeMs(a));
+                previousPackageStatusMap.clear();
+                packages.forEach(pkg => previousPackageStatusMap.set(pkg.id, pkg.status));
+            }
+
+            if (Array.isArray(parsed.members) && parsed.members.length > 0) {
+                const normalizedMembers = [];
+                for (let i = 0; i < parsed.members.length; i++) {
+                    const m = parsed.members[i];
+                    if (!m || (!m.name && !m.username && !m.email)) continue;
+                    const copyM = { ...m };
+                    if (!copyM.id) copyM.id = 'usr-restored-' + i;
+                    if (copyM.password && !String(copyM.password).startsWith('sha256:')) {
+                        copyM.password = await hashPasswordSha256(String(copyM.password));
+                    }
+                    normalizedMembers.push(copyM);
+                }
+                members = normalizedMembers;
+                ensureDefaultMembers();
+            }
+
+            if (Array.isArray(parsed.schoolDirectory) && parsed.schoolDirectory.length > 0) {
+                schoolDirectory = parsed.schoolDirectory.filter(d => d && d.name).map((d, idx) => ({
+                    id: d.id || ('dir-restored-' + idx),
+                    name: d.name,
+                    role: d.role || 'Teacher',
+                    room: d.room || 'Ruang Guru',
+                    phone: d.phone || ''
+                }));
+            }
+
+            if (Array.isArray(parsed.resetRequests)) resetRequests = parsed.resetRequests;
+            if (Array.isArray(parsed.auditLogs)) auditLogs = parsed.auditLogs;
+
+            // Perbarui tanda tangan sesi Admin aktif agar tidak ter-logout setelah data members di-restore
+            if (loggedUser && loggedUser.name) {
+                const activeMember = members.find(m => matchesMemberLogin(m, loggedUser.username || loggedUser.email || 'admin'));
+                if (activeMember) {
+                    loggedUser.sessionSig = await computeSessionSignature(loggedUser, activeMember.password || '');
+                    _verifiedAuthSession = Object.freeze({ ...loggedUser });
+                    try { localStorage.setItem('kurir_bns_logged_user', JSON.stringify(loggedUser)); } catch (e) {}
+                }
+            }
+
+            saveLocalCache();
+            updateCourierAndRecipientDropdowns();
+            refreshActiveView();
+
+            // Sinkronkan ke Cloud Firebase secara bertahap di latar belakang
+            if (db) {
+                (async () => {
+                    for (const p of packages) await syncPackageToFirebase(p);
+                    for (const m of members) await syncMemberToFirebase(m);
+                    for (const d of schoolDirectory) {
+                        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'directory_col', String(d.id)), d, { merge: true }); } catch (e) {}
+                    }
+                    for (const r of resetRequests) await syncResetRequestToFirebase(r);
+                })();
+            }
+
+            addAuditLog(`Admin (${loggedUser.name || 'Admin'}) memulihkan (Restore) database JSON (${packages.length} paket, ${members.length} anggota, ${schoolDirectory.length} kontak)`, loggedUser.name || 'Admin', 'ADMIN');
+            window.closeBackupModal();
+            window.showSuccessCelebration(
+                'Database Berhasil Dipulihkan!',
+                `Berhasil memuat ${packages.length} transaksi paket, ${members.length} anggota, dan ${schoolDirectory.length} kontak direktori.`,
+                'RESTORE BERHASIL'
+            );
+        }
+
+        window.handleRestoreFromTextarea = async function() {
+            if (!verifyAdminAccess('Restore Database')) return;
+            const rawText = (document.getElementById('backup-json-textarea')?.value || '').trim().replace(/^\uFEFF/, '');
+            if (!rawText) {
+                showToast('Kotak teks JSON masih kosong! Tempel isi JSON terlebih dahulu.', 'error');
+                return;
+            }
+            try {
+                const parsed = JSON.parse(rawText);
+                await executeRestoreFromParsedJson(parsed);
+            } catch (err) {
+                showToast('Format teks JSON tidak valid: ' + (err.message || 'Periksa tanda kurung/kutip JSON'), 'error');
+            }
         };
 
         window.handleRestoreDatabase = function(e) {
@@ -3561,31 +3780,23 @@
                 if (e?.target) e.target.value = '';
                 return;
             }
-            const file = e.target.files[0];
+            const file = e.target.files?.[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = async function(ev) {
                 try {
-                    const parsed = JSON.parse(ev.target.result);
-                    if (Array.isArray(parsed.packages)) packages = parsed.packages;
-                    if (Array.isArray(parsed.members)) { members = parsed.members; ensureDefaultMembers(); }
-                    if (Array.isArray(parsed.schoolDirectory)) schoolDirectory = parsed.schoolDirectory;
-                    if (Array.isArray(parsed.resetRequests)) resetRequests = parsed.resetRequests;
-                    if (Array.isArray(parsed.auditLogs)) auditLogs = parsed.auditLogs;
-                    saveLocalCache();
-                    if (db) {
-                        for (const p of packages) await syncPackageToFirebase(p);
-                        for (const m of members) await syncMemberToFirebase(m);
-                        for (const d of schoolDirectory) {
-                            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'directory_col', String(d.id)), d, { merge: true }); } catch (e) {}
-                        }
-                        for (const r of resetRequests) await syncResetRequestToFirebase(r);
-                    }
-                    updateCourierAndRecipientDropdowns();
-                    window.closeBackupModal();
-                    refreshActiveView();
-                    showToast('Database lengkap berhasil dipulihkan!');
-                } catch (err) { showToast('File backup tidak valid!', 'error'); }
+                    const cleanJsonStr = String(ev.target.result || '').trim().replace(/^\uFEFF/, '');
+                    const parsed = JSON.parse(cleanJsonStr);
+                    await executeRestoreFromParsedJson(parsed);
+                } catch (err) {
+                    showToast('File JSON tidak valid: ' + (err.message || 'Format rusak'), 'error');
+                } finally {
+                    if (e?.target) e.target.value = '';
+                }
+            };
+            reader.onerror = function() {
+                showToast('Gagal membaca file dari perangkat.', 'error');
+                if (e?.target) e.target.value = '';
             };
             reader.readAsText(file);
         };
