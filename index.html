@@ -1240,9 +1240,34 @@
                 <button type="button" onclick="window.cleanupCompletedPhotos()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 rounded-xl text-[8.5px] shadow-sm">Bersihkan Foto Paket Selesai</button>
             </div>
 
-            <div class="border-t pt-2 space-y-1.5">
-                <label class="block text-[9px] font-extrabold text-slate-700"><i class="fa-solid fa-file-import text-emerald-600 mr-1"></i>1. Restore dari File Backup (.json)</label>
-                <input type="file" id="restore-file-input" accept=".json,application/json,text/plain,.txt" onchange="window.handleRestoreDatabase(event)" class="w-full text-[9px] file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[8.5px] file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border rounded-xl p-1 bg-slate-50">
+            <div class="border-t pt-2 space-y-2">
+                <div class="flex justify-between items-center">
+                    <label class="block text-[9px] font-extrabold text-slate-700"><i class="fa-solid fa-file-import text-emerald-600 mr-1"></i>1. Restore dari File Backup (.json — Support 25MB+)</label>
+                    <span class="text-[7.5px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">Auto-Shrink Foto</span>
+                </div>
+                <div class="bg-slate-50 p-2 rounded-xl border border-slate-200 space-y-1 text-[8px] text-slate-700">
+                    <label class="flex items-center space-x-1.5 cursor-pointer font-semibold">
+                        <input type="checkbox" id="restore-opt-compress-photos" checked class="rounded text-emerald-600">
+                        <span>Kompres Otomatis Foto Raksasa dari File Lama (Agar Muat di Cloud &lt; 1MB)</span>
+                    </label>
+                    <label class="flex items-center space-x-1.5 cursor-pointer font-semibold text-amber-800">
+                        <input type="checkbox" id="restore-opt-skip-photos" class="rounded text-amber-600">
+                        <span>Abaikan Foto Lama (Khusus Data Teks — Instan &lt; 1 Detik untuk File 25MB+)</span>
+                    </label>
+                </div>
+                <input type="file" id="restore-file-input" accept=".json,application/json,text/plain,.txt" onchange="window.handleRestoreDatabase(event)" class="w-full text-[9px] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[8.5px] file:font-extrabold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer border rounded-xl p-1 bg-slate-50">
+
+                <!-- Live Progress Bar untuk Restore File Besar (25MB+) -->
+                <div id="restore-progress-box" class="hidden p-2.5 rounded-2xl bg-indigo-50 border border-indigo-200 space-y-1.5">
+                    <div class="flex justify-between items-center text-[8.5px] font-extrabold text-indigo-900">
+                        <span id="restore-progress-status"><i class="fa-solid fa-spinner fa-spin mr-1 text-indigo-600"></i>Memproses file besar...</span>
+                        <span id="restore-progress-pct">0%</span>
+                    </div>
+                    <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
+                        <div id="restore-progress-bar" class="h-full bg-gradient-to-r from-indigo-600 to-emerald-500 transition-all duration-200" style="width: 0%"></div>
+                    </div>
+                    <p id="restore-progress-detail" class="text-[7.5px] text-indigo-700 font-medium">Mohon jangan tutup jendela ini hingga selesai.</p>
+                </div>
             </div>
 
             <div class="border-t pt-2 space-y-1.5">
@@ -1820,6 +1845,8 @@
             return _idbPromise;
         }
 
+        let isRestoringDatabase = false;
+
         async function savePackagePhotosToIdb(pkg) {
             if (!pkg || !pkg.id) return;
             if (!pkg.physicalPhotoUrl && !pkg.proofPhotoUrl && !pkg.signatureDataUrl) return;
@@ -1835,6 +1862,61 @@
                     updatedAt: Date.now()
                 });
             } catch (e) {}
+        }
+
+        // Batch simpan ratusan foto ke IndexedDB dalam 1 transaksi tunggal (anti-macet untuk file 25MB+)
+        async function savePackagesPhotosBatchToIdb(pkgList) {
+            if (!Array.isArray(pkgList) || pkgList.length === 0) return;
+            const dbIdb = await openPhotoIdb();
+            if (!dbIdb) return;
+            try {
+                const tx = dbIdb.transaction(IDB_PHOTO_STORE, 'readwrite');
+                const store = tx.objectStore(IDB_PHOTO_STORE);
+                const now = Date.now();
+                for (let i = 0; i < pkgList.length; i++) {
+                    const p = pkgList[i];
+                    if (p && p.id && (p.physicalPhotoUrl || p.proofPhotoUrl || p.signatureDataUrl)) {
+                        store.put({
+                            id: String(p.id),
+                            physicalPhotoUrl: p.physicalPhotoUrl || null,
+                            proofPhotoUrl: p.proofPhotoUrl || null,
+                            signatureDataUrl: p.signatureDataUrl || null,
+                            updatedAt: now
+                        });
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Kompresi ulang string Base64 raksasa dari file backup lama (>65KB) menjadi ~25-40KB agar tidak ditolak Firestore (Limit 1MB)
+        function shrinkLegacyBase64Image(dataUrl, maxWidth = 480, quality = 0.52) {
+            return new Promise((resolve) => {
+                if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+                    resolve(dataUrl || null);
+                    return;
+                }
+                // Jika sudah cukup kecil (< 75.000 karakter / ~55 KB), tidak perlu dikompres ulang
+                if (dataUrl.length < 75000) {
+                    resolve(dataUrl);
+                    return;
+                }
+                const img = new Image();
+                const timer = setTimeout(() => resolve(dataUrl.slice(0, 240000)), 1500);
+                img.onload = () => {
+                    clearTimeout(timer);
+                    try {
+                        const result = compressImageFromElement(img, maxWidth, quality);
+                        resolve(result);
+                    } catch (e) {
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => {
+                    clearTimeout(timer);
+                    resolve(null);
+                };
+                img.src = dataUrl;
+            });
         }
 
         async function deletePackagePhotosFromIdb(pkgId) {
@@ -2648,13 +2730,16 @@
             } catch (e) {}
 
             const topPackages = packages.slice(0, 150);
-            topPackages.slice(0, 40).forEach(p => { savePackagePhotosToIdb(p); });
+            if (!isRestoringDatabase) {
+                topPackages.slice(0, 25).forEach(p => { savePackagePhotosToIdb(p); });
+            }
 
-            let inlinePhotoBudget = 8;
+            let inlinePhotoBudget = 5;
             const lightPackages = topPackages.map(p => {
                 const isActive = p.status !== 'completed';
-                const keepInline = isActive && inlinePhotoBudget > 0;
-                if (keepInline && (p.physicalPhotoUrl || p.proofPhotoUrl || p.signatureDataUrl)) {
+                const totalImgLen = (p.physicalPhotoUrl?.length || 0) + (p.proofPhotoUrl?.length || 0) + (p.signatureDataUrl?.length || 0);
+                const keepInline = isActive && inlinePhotoBudget > 0 && totalImgLen < 120000;
+                if (keepInline && totalImgLen > 0) {
                     inlinePhotoBudget--;
                     return p;
                 }
@@ -3747,6 +3832,8 @@
                 const pkgQueryRef = cloudQueryLimit > 0 ? query(pkgColRef, limit(cloudQueryLimit)) : pkgColRef;
 
                 _unsubPackages = onSnapshot(pkgQueryRef, (snapshot) => {
+                    // Jangan timpa memori lokal saat proses Restore File Besar (25MB+) sedang berjalan!
+                    if (isRestoringDatabase) return;
                     const cloudPkgs = [];
                     snapshot.forEach(docSnap => {
                         const raw = docSnap.data() || {};
@@ -3758,7 +3845,29 @@
                         raw.timestampRaw = parsePackageTimeMs(raw);
                         cloudPkgs.push(raw);
                     });
-                    const sortedCloud = cloudPkgs.sort((a,b) => parsePackageTimeMs(b) - parsePackageTimeMs(a));
+                    // Gabungkan (Merge) dengan paket lokal yang mungkin sedang dalam antrian sinkronisasi Cloud
+                    const mergedMap = new Map();
+                    packages.forEach(localPkg => {
+                        if (localPkg && localPkg.id && !deletedPkgBlacklist.has(String(localPkg.id))) {
+                            mergedMap.set(String(localPkg.id), localPkg);
+                        }
+                    });
+                    cloudPkgs.forEach(cloudPkg => {
+                        const existingLocal = mergedMap.get(String(cloudPkg.id));
+                        if (existingLocal) {
+                            // Pertahankan foto lokal di memori jika di Cloud belum terunggah penuh
+                            mergedMap.set(String(cloudPkg.id), {
+                                ...existingLocal,
+                                ...cloudPkg,
+                                physicalPhotoUrl: cloudPkg.physicalPhotoUrl || existingLocal.physicalPhotoUrl || null,
+                                proofPhotoUrl: cloudPkg.proofPhotoUrl || existingLocal.proofPhotoUrl || null,
+                                signatureDataUrl: cloudPkg.signatureDataUrl || existingLocal.signatureDataUrl || null
+                            });
+                        } else {
+                            mergedMap.set(String(cloudPkg.id), cloudPkg);
+                        }
+                    });
+                    const sortedCloud = Array.from(mergedMap.values()).sort((a,b) => parsePackageTimeMs(b) - parsePackageTimeMs(a));
                     if ( previousPackageStatusMap.size > 0 ) {
                         sortedCloud.forEach(pkg => {
                             const prevStatus = previousPackageStatusMap.get(pkg.id);
@@ -3817,6 +3926,7 @@
                 });
 
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members_col'), (snapshot) => {
+                    if (isRestoringDatabase) return;
                     const cloudMembers = [];
                     snapshot.forEach(docSnap => {
                         const m = docSnap.data();
@@ -4037,144 +4147,287 @@
             }
         };
 
+        function updateRestoreProgressUi(show, percent = 0, statusText = '', detailText = '') {
+            const box = document.getElementById('restore-progress-box');
+            const bar = document.getElementById('restore-progress-bar');
+            const pct = document.getElementById('restore-progress-pct');
+            const st = document.getElementById('restore-progress-status');
+            const dt = document.getElementById('restore-progress-detail');
+            if (!box) return;
+            box.classList.toggle('hidden', !show);
+            if (bar) bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+            if (pct) pct.innerText = `${Math.round(percent)}%`;
+            if (st && statusText) st.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1 text-indigo-600"></i>${escapeHtml(statusText)}`;
+            if (dt && detailText) dt.innerText = detailText;
+        }
+
+        // Ekstraktor cerdas untuk mendukung berbagai struktur file JSON backup versi lama maupun Firebase Export langsung
+        function extractCollectionsFromLegacyJson(parsed) {
+            if (!parsed || typeof parsed !== 'object') return {};
+            if (Array.isArray(parsed)) {
+                return { rawPackages: parsed };
+            }
+            let rawPackages = null;
+            if (Array.isArray(parsed.packages)) rawPackages = parsed.packages;
+            else if (Array.isArray(parsed.data)) rawPackages = parsed.data;
+            else if (Array.isArray(parsed.packages_col)) rawPackages = parsed.packages_col;
+            else if (parsed.packages && typeof parsed.packages === 'object') rawPackages = Object.values(parsed.packages);
+            else if (parsed.packages_col && typeof parsed.packages_col === 'object') rawPackages = Object.values(parsed.packages_col);
+            else if (parsed.data && typeof parsed.data === 'object') {
+                if (Array.isArray(parsed.data.packages)) rawPackages = parsed.data.packages;
+                else if (parsed.data.packages_col && typeof parsed.data.packages_col === 'object') rawPackages = Object.values(parsed.data.packages_col);
+            } else {
+                // Cek apakah root objek adalah map dari TRX-... (hasil export langsung node Firebase)
+                const vals = Object.values(parsed);
+                if (vals.length > 0 && vals.every(v => v && typeof v === 'object' && (v.recipient || v.resi || v.destination || v.status))) {
+                    rawPackages = vals;
+                }
+            }
+
+            const extractArr = (key, altKey) => {
+                if (Array.isArray(parsed[key])) return parsed[key];
+                if (parsed[key] && typeof parsed[key] === 'object') return Object.values(parsed[key]);
+                if (altKey && Array.isArray(parsed[altKey])) return parsed[altKey];
+                if (altKey && parsed[altKey] && typeof parsed[altKey] === 'object') return Object.values(parsed[altKey]);
+                if (parsed.data && typeof parsed.data === 'object') {
+                    if (Array.isArray(parsed.data[key])) return parsed.data[key];
+                    if (parsed.data[key] && typeof parsed.data[key] === 'object') return Object.values(parsed.data[key]);
+                }
+                return null;
+            };
+
+            return {
+                rawPackages,
+                rawMembers: extractArr('members', 'members_col'),
+                rawDirectory: extractArr('schoolDirectory', 'directory_col'),
+                rawResets: extractArr('resetRequests', 'reset_requests_col'),
+                rawAudit: extractArr('auditLogs', 'audit_logs_col')
+            };
+        }
+
         async function executeRestoreFromParsedJson(parsed) {
             if (!parsed || typeof parsed !== 'object') {
                 throw new Error('Struktur JSON kosong atau bukan objek valid');
             }
-            // Dukung format objek backup standar maupun array paket langsung
-            const rawPackages = Array.isArray(parsed)
-                ? parsed
-                : (Array.isArray(parsed.packages) ? parsed.packages : (Array.isArray(parsed.data) ? parsed.data : null));
+            const { rawPackages, rawMembers, rawDirectory, rawResets, rawAudit } = extractCollectionsFromLegacyJson(parsed);
 
-            const hasValidSection = rawPackages || Array.isArray(parsed.members) || Array.isArray(parsed.schoolDirectory) || Array.isArray(parsed.resetRequests) || Array.isArray(parsed.auditLogs);
+            const hasValidSection = Array.isArray(rawPackages) || Array.isArray(rawMembers) || Array.isArray(rawDirectory) || Array.isArray(rawResets) || Array.isArray(rawAudit);
             if (!hasValidSection) {
-                throw new Error('File JSON tidak memiliki data packages, members, atau schoolDirectory');
+                throw new Error('Struktur JSON tidak dikenali (tidak ditemukan data packages, members, atau directory)');
             }
 
-            if (Array.isArray(rawPackages)) {
-                const normalizedPkgs = rawPackages.filter(p => p && (p.id || p.recipient)).map((p, idx) => {
-                    const resolvedId = String(p.id || ('TRX-RESTORE-' + Date.now() + '-' + idx));
-                    // Hapus dari blacklist agar tidak dibuang oleh sinkronisasi Cloud
-                    deletedPkgBlacklist.delete(resolvedId);
-                    if (p._docId) deletedPkgBlacklist.delete(String(p._docId));
-                    const cleanPkg = {
-                        ...p,
-                        id: resolvedId,
-                        recipient: p.recipient || 'Penerima',
-                        destination: p.destination || 'Ruang Guru',
-                        status: ['pending', 'delivering', 'completed'].includes(p.status) ? p.status : 'pending',
-                        timestampRaw: parsePackageTimeMs(p)
-                    };
-                    savePackagePhotosToIdb(cleanPkg);
-                    return cleanPkg;
-                });
-                try {
-                    localStorage.setItem('kurir_bns_deleted_ids', JSON.stringify(Array.from(deletedPkgBlacklist)));
-                } catch (e) {}
-                packages = normalizedPkgs.sort((a, b) => parsePackageTimeMs(b) - parsePackageTimeMs(a));
-                previousPackageStatusMap.clear();
-                packages.forEach(pkg => previousPackageStatusMap.set(pkg.id, pkg.status));
-            }
+            isRestoringDatabase = true;
+            const shouldCompress = document.getElementById('restore-opt-compress-photos')?.checked ?? true;
+            const shouldSkipPhotos = document.getElementById('restore-opt-skip-photos')?.checked ?? false;
 
-            if (Array.isArray(parsed.members) && parsed.members.length > 0) {
-                const normalizedMembers = [];
-                for (let i = 0; i < parsed.members.length; i++) {
-                    const m = parsed.members[i];
-                    if (!m || (!m.name && !m.username && !m.email)) continue;
-                    const copyM = { ...m };
-                    if (!copyM.id) copyM.id = 'usr-restored-' + i;
-                    if (copyM.password && !String(copyM.password).startsWith('sha256:')) {
-                        copyM.password = await hashPasswordSha256(String(copyM.password));
+            try {
+                if (Array.isArray(rawPackages)) {
+                    const validRaw = rawPackages.filter(p => p && typeof p === 'object' && (p.id || p.recipient || p.resi));
+                    const totalPkgs = validRaw.length;
+                    const normalizedPkgs = [];
+                    const CHUNK_SIZE = 8;
+
+                    for (let i = 0; i < totalPkgs; i += CHUNK_SIZE) {
+                        const slice = validRaw.slice(i, i + CHUNK_SIZE);
+                        const pct = 30 + Math.round(((i + slice.length) / Math.max(1, totalPkgs)) * 45);
+                        updateRestoreProgressUi(
+                            true,
+                            pct,
+                            `Memproses paket (${Math.min(totalPkgs, i + slice.length)} / ${totalPkgs})...`,
+                            shouldSkipPhotos ? 'Mengimpor metadata transaksi tanpa foto...' : (shouldCompress ? 'Mengompresi otomatis foto berukuran besar agar muat di Cloud...' : 'Memuat data paket...')
+                        );
+                        // Beri jeda 1 frame agar UI browser tidak freeze saat memproses file 25MB+
+                        await new Promise(r => setTimeout(r, 0));
+
+                        const processedChunk = await Promise.all(slice.map(async (p, idx) => {
+                            const resolvedId = String(p.id || ('TRX-RESTORE-' + Date.now() + '-' + (i + idx)));
+                            deletedPkgBlacklist.delete(resolvedId);
+                            if (p._docId) deletedPkgBlacklist.delete(String(p._docId));
+
+                            let physUrl = p.physicalPhotoUrl || p.physicalPhoto || p.photoUrl || null;
+                            let proofUrl = p.proofPhotoUrl || p.proofPhoto || null;
+                            let sigUrl = p.signatureDataUrl || p.signatureUrl || null;
+
+                            if (shouldSkipPhotos) {
+                                physUrl = null;
+                                proofUrl = null;
+                                sigUrl = null;
+                            } else if (shouldCompress) {
+                                if (physUrl && physUrl.length > 75000) physUrl = await shrinkLegacyBase64Image(physUrl, 480, 0.50);
+                                if (proofUrl && proofUrl.length > 75000) proofUrl = await shrinkLegacyBase64Image(proofUrl, 480, 0.50);
+                                if (sigUrl && sigUrl.length > 75000) sigUrl = await shrinkLegacyBase64Image(sigUrl, 400, 0.55);
+                            }
+
+                            const cleanPkg = {
+                                ...p,
+                                id: resolvedId,
+                                recipient: p.recipient || 'Penerima',
+                                role: p.role || 'Teacher',
+                                destination: p.destination || 'Ruang Guru',
+                                status: ['pending', 'delivering', 'completed'].includes(p.status) ? p.status : 'pending',
+                                timestampRaw: parsePackageTimeMs(p),
+                                physicalPhotoUrl: physUrl,
+                                proofPhotoUrl: proofUrl,
+                                signatureDataUrl: sigUrl
+                            };
+                            delete cleanPkg.physicalPhoto;
+                            delete cleanPkg.photoUrl;
+                            delete cleanPkg.proofPhoto;
+                            delete cleanPkg.signatureUrl;
+                            return cleanPkg;
+                        }));
+
+                        normalizedPkgs.push(...processedChunk);
                     }
-                    normalizedMembers.push(copyM);
+
+                    try {
+                        localStorage.setItem('kurir_bns_deleted_ids', JSON.stringify(Array.from(deletedPkgBlacklist)));
+                    } catch (e) {}
+
+                    packages = normalizedPkgs.sort((a, b) => parsePackageTimeMs(b) - parsePackageTimeMs(a));
+                    previousPackageStatusMap.clear();
+                    packages.forEach(pkg => previousPackageStatusMap.set(pkg.id, pkg.status));
+
+                    updateRestoreProgressUi(true, 80, 'Menyimpan foto ke IndexedDB lokal...', `Menyimpan ${packages.length} transaksi ke penyimpanan perangkat.`);
+                    await savePackagesPhotosBatchToIdb(packages);
                 }
-                members = normalizedMembers;
-                ensureDefaultMembers();
-            }
 
-            if (Array.isArray(parsed.schoolDirectory) && parsed.schoolDirectory.length > 0) {
-                schoolDirectory = parsed.schoolDirectory.filter(d => d && d.name).map((d, idx) => ({
-                    id: d.id || ('dir-restored-' + idx),
-                    name: d.name,
-                    role: d.role || 'Teacher',
-                    room: d.room || 'Ruang Guru',
-                    phone: d.phone || ''
-                }));
-            }
-
-            if (Array.isArray(parsed.resetRequests)) resetRequests = parsed.resetRequests;
-            if (Array.isArray(parsed.auditLogs)) auditLogs = parsed.auditLogs;
-
-            // Perbarui tanda tangan sesi Admin aktif agar tidak ter-logout setelah data members di-restore
-            if (loggedUser && loggedUser.name) {
-                const activeMember = members.find(m => matchesMemberLogin(m, loggedUser.username || loggedUser.email || 'admin'));
-                if (activeMember) {
-                    loggedUser.sessionSig = await computeSessionSignature(loggedUser, activeMember.password || '');
-                    _verifiedAuthSession = Object.freeze({ ...loggedUser });
-                    try { localStorage.setItem('kurir_bns_logged_user', JSON.stringify(loggedUser)); } catch (e) {}
+                if (Array.isArray(rawMembers) && rawMembers.length > 0) {
+                    const normalizedMembers = [];
+                    for (let i = 0; i < rawMembers.length; i++) {
+                        const m = rawMembers[i];
+                        if (!m || (!m.name && !m.username && !m.email)) continue;
+                        const copyM = { ...m };
+                        if (!copyM.id) copyM.id = 'usr-restored-' + i;
+                        if (copyM.password && !String(copyM.password).startsWith('sha256:')) {
+                            copyM.password = await hashPasswordSha256(String(copyM.password));
+                        }
+                        normalizedMembers.push(copyM);
+                    }
+                    members = normalizedMembers;
+                    ensureDefaultMembers();
                 }
-            }
 
-            saveLocalCache();
-            updateCourierAndRecipientDropdowns();
-            refreshActiveView();
+                if (Array.isArray(rawDirectory) && rawDirectory.length > 0) {
+                    schoolDirectory = rawDirectory.filter(d => d && d.name).map((d, idx) => ({
+                        id: d.id || ('dir-restored-' + idx),
+                        name: d.name,
+                        role: d.role || 'Teacher',
+                        room: d.room || 'Ruang Guru',
+                        phone: d.phone || ''
+                    }));
+                }
 
-            // Sinkronkan ke Cloud Firebase secara bertahap di latar belakang
-            if (db) {
-                (async () => {
-                    for (const p of packages) await syncPackageToFirebase(p);
+                if (Array.isArray(rawResets)) resetRequests = rawResets;
+                if (Array.isArray(rawAudit)) auditLogs = rawAudit;
+
+                // Perbarui tanda tangan sesi Admin aktif agar tetap valid
+                if (loggedUser && loggedUser.name) {
+                    const activeMember = members.find(m => matchesMemberLogin(m, loggedUser.username || loggedUser.email || 'admin'));
+                    if (activeMember) {
+                        loggedUser.sessionSig = await computeSessionSignature(loggedUser, activeMember.password || '');
+                        _verifiedAuthSession = Object.freeze({ ...loggedUser });
+                        try { localStorage.setItem('kurir_bns_logged_user', JSON.stringify(loggedUser)); } catch (e) {}
+                    }
+                }
+
+                saveLocalCache();
+                updateCourierAndRecipientDropdowns();
+                refreshActiveView();
+
+                // Sinkronkan ke Cloud Firestore secara paralel bertahap (Chunked Batch) tanpa tertahan timeout Storage
+                if (db) {
+                    const totalToSync = packages.length;
+                    const SYNC_BATCH_SIZE = 12;
+                    for (let i = 0; i < totalToSync; i += SYNC_BATCH_SIZE) {
+                        const batchSlice = packages.slice(i, i + SYNC_BATCH_SIZE);
+                        const syncPct = 82 + Math.round(((i + batchSlice.length) / Math.max(1, totalToSync)) * 18);
+                        updateRestoreProgressUi(
+                            true,
+                            syncPct,
+                            `Sinkronisasi ke Cloud (${Math.min(totalToSync, i + batchSlice.length)} / ${totalToSync})...`,
+                            'Mengunggah dokumen transaksi yang telah dirampingkan ke Firestore...'
+                        );
+                        await Promise.all(batchSlice.map(async (p) => {
+                            try {
+                                const docPayload = { ...p };
+                                // Pastikan dokumen tidak pernah melebihi batas 1MB Firestore
+                                const approxSize = JSON.stringify(docPayload).length;
+                                if (approxSize > 900000) {
+                                    docPayload.physicalPhotoUrl = await shrinkLegacyBase64Image(docPayload.physicalPhotoUrl, 360, 0.42);
+                                    docPayload.proofPhotoUrl = await shrinkLegacyBase64Image(docPayload.proofPhotoUrl, 360, 0.42);
+                                }
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'packages_col', String(p.id)), docPayload, { merge: true });
+                            } catch (e) {}
+                        }));
+                    }
                     for (const m of members) await syncMemberToFirebase(m);
                     for (const d of schoolDirectory) {
                         try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'directory_col', String(d.id)), d, { merge: true }); } catch (e) {}
                     }
                     for (const r of resetRequests) await syncResetRequestToFirebase(r);
-                })();
-            }
+                }
 
-            addAuditLog(`Admin (${loggedUser.name || 'Admin'}) memulihkan (Restore) database JSON (${packages.length} paket, ${members.length} anggota, ${schoolDirectory.length} kontak)`, loggedUser.name || 'Admin', 'ADMIN');
-            window.closeBackupModal();
-            window.showSuccessCelebration(
-                'Database Berhasil Dipulihkan!',
-                `Berhasil memuat ${packages.length} transaksi paket, ${members.length} anggota, dan ${schoolDirectory.length} kontak direktori.`,
-                'RESTORE BERHASIL'
-            );
+                updateRestoreProgressUi(false, 100, 'Selesai!', '');
+                addAuditLog(`Admin (${loggedUser.name || 'Admin'}) memulihkan (Restore) database JSON (${packages.length} paket, ${members.length} anggota, ${schoolDirectory.length} kontak)`, loggedUser.name || 'Admin', 'ADMIN');
+                window.closeBackupModal();
+                window.showSuccessCelebration(
+                    'Database 25MB+ Berhasil Dipulihkan!',
+                    `Berhasil memulihkan ${packages.length} transaksi paket, ${members.length} anggota, dan ${schoolDirectory.length} kontak direktori ke Lokal & Cloud.`,
+                    'RESTORE TUNTAS'
+                );
+            } finally {
+                // Lepas kunci onSnapshot setelah jeda singkat agar event snapshot sisa tidak mengganggu
+                setTimeout(() => { isRestoringDatabase = false; }, 1500);
+            }
         }
 
         window.handleRestoreFromTextarea = async function() {
-            if (!verifyAdminAccess('Restore Database')) return;
             const rawText = (document.getElementById('backup-json-textarea')?.value || '').trim().replace(/^\uFEFF/, '');
             if (!rawText) {
                 showToast('Kotak teks JSON masih kosong! Tempel isi JSON terlebih dahulu.', 'error');
                 return;
             }
             try {
+                updateRestoreProgressUi(true, 20, 'Mem-parsing teks JSON...', 'Menganalisis struktur data...');
+                await new Promise(r => setTimeout(r, 20));
                 const parsed = JSON.parse(rawText);
                 await executeRestoreFromParsedJson(parsed);
             } catch (err) {
+                updateRestoreProgressUi(false);
                 showToast('Format teks JSON tidak valid: ' + (err.message || 'Periksa tanda kurung/kutip JSON'), 'error');
             }
         };
 
         window.handleRestoreDatabase = function(e) {
-            if (!verifyAdminAccess('Restore Database')) {
-                if (e?.target) e.target.value = '';
-                return;
-            }
             const file = e.target.files?.[0];
             if (!file) return;
+            const fileSizeMb = (file.size / (1024 * 1024)).toFixed(1);
+            updateRestoreProgressUi(true, 5, `Membaca file ${file.name} (${fileSizeMb} MB)...`, 'Mohon tunggu, sedang memuat file berukuran besar ke memori...');
+
             const reader = new FileReader();
+            reader.onprogress = function(progEvt) {
+                if (progEvt.lengthComputable && progEvt.total > 0) {
+                    const readPct = Math.round((progEvt.loaded / progEvt.total) * 22);
+                    updateRestoreProgressUi(true, Math.max(5, readPct), `Membaca file (${fileSizeMb} MB)...`, `Terbaca ${Math.round(progEvt.loaded / (1024 * 1024))} MB dari ${fileSizeMb} MB`);
+                }
+            };
             reader.onload = async function(ev) {
                 try {
+                    updateRestoreProgressUi(true, 25, `Mengurai struktur JSON (${fileSizeMb} MB)...`, 'Sedang mengekstrak daftar transaksi dan foto...');
+                    await new Promise(r => setTimeout(r, 30));
                     const cleanJsonStr = String(ev.target.result || '').trim().replace(/^\uFEFF/, '');
                     const parsed = JSON.parse(cleanJsonStr);
                     await executeRestoreFromParsedJson(parsed);
                 } catch (err) {
-                    showToast('File JSON tidak valid: ' + (err.message || 'Format rusak'), 'error');
+                    updateRestoreProgressUi(false);
+                    showToast('Gagal memulihkan file JSON: ' + (err.message || 'Format JSON rusak'), 'error');
                 } finally {
                     if (e?.target) e.target.value = '';
                 }
             };
             reader.onerror = function() {
+                updateRestoreProgressUi(false);
                 showToast('Gagal membaca file dari perangkat.', 'error');
                 if (e?.target) e.target.value = '';
             };
