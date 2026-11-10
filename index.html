@@ -122,6 +122,8 @@
             body.printing-audit #print-audit-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
             body.printing-manifest #print-manifest-card, body.printing-manifest #print-manifest-card * { visibility: visible !important; background-color: #ffffff !important; color: #0f172a !important; }
             body.printing-manifest #print-manifest-card { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; box-shadow: none !important; border: none !important; }
+            body.printing-batch-qr #batch-qr-print-sheet, body.printing-batch-qr #batch-qr-print-sheet * { visibility: visible !important; background-color: #ffffff !important; color: #0f172a !important; }
+            body.printing-batch-qr #batch-qr-print-sheet { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; box-shadow: none !important; border: none !important; }
         }
         @keyframes pulse-urgent { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
         .sla-overdue-badge { animation: pulse-urgent 1.2s infinite ease-in-out; }
@@ -270,9 +272,22 @@
                     <i class="fa-solid fa-rocket text-amber-200 text-[10px]"></i><span>Masuk ke Workspace</span>
                 </button>
             </form>
+            <!-- Fitur Lacak Resi Cepat Tanpa Login -->
+            <div class="p-3 rounded-2xl bg-indigo-50/80 border border-indigo-200/80 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[9.5px] font-extrabold text-indigo-950 flex items-center"><i class="fa-solid fa-magnifying-glass-location text-indigo-600 mr-1.5"></i>Lacak Resi Cepat (Tanpa Login)</span>
+                    <span class="text-[7.5px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">Instan</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <input type="text" id="quick-track-input" onkeydown="if(event.key==='Enter'){event.preventDefault();window.handleQuickTrackSearch();}" placeholder="Ketik No. Resi, ID TRX, atau Nama..." class="flex-1 px-2.5 py-1.5 rounded-xl border border-indigo-200 text-[9.5px] bg-white">
+                    <button type="button" onclick="window.handleQuickTrackSearch()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[9px] shadow shrink-0"><i class="fa-solid fa-search mr-1"></i>Cek</button>
+                </div>
+                <div id="quick-track-result-box" class="hidden space-y-1.5 max-h-44 overflow-y-auto pr-0.5 pt-1"></div>
+            </div>
+
             <div class="bg-slate-50/80 p-2 rounded-xl border border-white text-[8.5px] text-slate-500 text-center flex justify-between items-center px-3">
-                <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Cloud Firebase Aktif</span>
-                <span class="font-mono text-[8px] text-indigo-600 font-bold">Smart Logistics v4.5.4</span>
+                <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Cloud Storage & Sync Aktif</span>
+                <span class="font-mono text-[8px] text-indigo-600 font-bold">Smart Logistics v4.5.5</span>
             </div>
         </div>
     </div>
@@ -498,6 +513,7 @@
                             <p class="text-[8px] text-slate-500 hide-in-fullscreen mt-0.5">Pantau pergerakan paket dari Pos Penerimaan hingga diterima di ruangan tujuan</p>
                         </div>
                         <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                            <button type="button" onclick="window.openBatchQrModal('petugas')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-xl text-[8.5px] font-bold shadow transition flex items-center space-x-1" title="Cetak Banyak Stiker QR Sekaligus"><i class="fa-solid fa-qrcode"></i><span>Cetak QR Massal</span></button>
                             <button onclick="window.exportPetugasReport('filtered')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-xl text-[8.5px] font-bold shadow transition flex items-center space-x-1"><i class="fa-solid fa-filter"></i><span>Export Filter</span></button>
                             <button onclick="window.exportPetugasReport('all')" class="bg-teal-700 hover:bg-teal-800 text-white px-2.5 py-1 rounded-xl text-[8.5px] font-bold shadow transition flex items-center space-x-1"><i class="fa-solid fa-file-excel"></i><span>Export Semua</span></button>
                             <button onclick="window.togglePetugasFullscreen()" id="petugas-fullscreen-btn" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1 rounded-xl text-[9px] font-bold transition flex items-center space-x-1 border border-indigo-200"><i id="petugas-fullscreen-icon" class="fa-solid fa-expand"></i><span id="petugas-fullscreen-text">Fullscreen</span></button>
@@ -774,17 +790,25 @@
                         <span class="bg-rose-600 px-2.5 py-0.5 rounded-full" id="admin-batch-selected-count">0 Transaksi Dipilih</span>
                         <button type="button" onclick="window.clearAdminPkgSelection()" class="text-rose-200 hover:text-white underline text-[9px]">Batal Pilih</button>
                     </div>
-                    <button type="button" onclick="window.deleteSelectedPackagesAdmin()" class="bg-rose-500 hover:bg-rose-600 text-white font-extrabold px-3.5 py-1.5 rounded-xl text-[9.5px] shadow flex items-center space-x-1.5">
-                        <i class="fa-solid fa-trash-can"></i><span>Hapus Semua yang Dipilih</span>
-                    </button>
+                    <div class="flex items-center space-x-1.5">
+                        <button type="button" onclick="window.openBatchQrModal('admin')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-[9.5px] shadow flex items-center space-x-1.5">
+                            <i class="fa-solid fa-qrcode"></i><span>Cetak QR Terpilih</span>
+                        </button>
+                        <button type="button" onclick="window.deleteSelectedPackagesAdmin()" class="bg-rose-500 hover:bg-rose-600 text-white font-extrabold px-3.5 py-1.5 rounded-xl text-[9.5px] shadow flex items-center space-x-1.5">
+                            <i class="fa-solid fa-trash-can"></i><span>Hapus Semua yang Dipilih</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
                     <div class="flex justify-between items-center mb-2.5 flex-wrap gap-2">
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2 flex-wrap gap-y-1">
                             <h3 class="font-bold text-slate-800 text-[10px]">Inspeksi 360° & Kelola Seluruh Paket (<span id="admin-pkg-total-label">0</span>)</h3>
                             <button type="button" onclick="window.selectAllAdminPackagesVisible()" class="text-[8.5px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1 rounded-lg border border-indigo-200 transition">
                                 <i class="fa-solid fa-check-double mr-1"></i>Pilih Semua Tampil
+                            </button>
+                            <button type="button" onclick="window.openBatchQrModal('admin')" class="text-[8.5px] bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-2.5 py-1 rounded-lg border border-purple-200 transition">
+                                <i class="fa-solid fa-qrcode mr-1"></i>Cetak QR Massal
                             </button>
                         </div>
                         <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
@@ -1192,6 +1216,22 @@
                 </button>
             </div>
 
+            <div class="bg-sky-50 p-2.5 rounded-2xl border border-sky-200 space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <span class="text-[8.5px] font-extrabold text-sky-900"><i class="fa-solid fa-cloud-bolt mr-1 text-sky-600"></i>Optimasi Query Kuota Cloud & Firebase Storage</span>
+                    <span id="cloud-storage-status-badge" class="text-[7.5px] bg-sky-200 text-sky-900 px-2 py-0.5 rounded-full font-bold">Storage Aktif</span>
+                </div>
+                <div class="flex items-center justify-between gap-2 text-[8.5px]">
+                    <span class="text-slate-600 font-semibold">Batas Tarik Data Cloud (Hemat Read Quota):</span>
+                    <select id="cloud-query-limit-select" onchange="window.handleCloudQueryLimitChange(this.value)" class="px-2 py-1 rounded-lg border border-sky-300 bg-white font-bold text-sky-800 text-[8.5px]">
+                        <option value="100">100 Paket (Hemat Kuota)</option>
+                        <option value="250" selected>250 Paket (Standar)</option>
+                        <option value="500">500 Paket</option>
+                        <option value="0">Semua Paket (Tanpa Batas)</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="bg-amber-50 p-2.5 rounded-2xl border border-amber-200 space-y-1.5">
                 <div class="flex justify-between items-center">
                     <span class="text-[8.5px] font-bold text-amber-800"><i class="fa-solid fa-images mr-1"></i>Retensi & Pembersih Memori Foto</span>
@@ -1339,6 +1379,91 @@
             <div class="grid grid-cols-2 gap-1.5">
                 <button type="button" onclick="window.closeQrLabelModal()" class="py-1.5 rounded-lg border font-semibold text-[9px]">Tutup</button>
                 <button type="button" onclick="window.printQrLabelSticker()" class="py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[9px] shadow"><i class="fa-solid fa-print mr-1"></i>Cetak Stiker</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch QR Print Modal (Cetak Stiker QR Massal) -->
+    <div id="batch-qr-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-[80] flex items-center justify-center p-3 hidden" onclick="window.closeBatchQrModal()">
+        <div class="bg-white rounded-3xl max-w-3xl w-full p-4 shadow-2xl space-y-3 max-h-[92vh] flex flex-col" onclick="event.stopPropagation()">
+            <div class="flex flex-wrap justify-between items-center border-b pb-2 gap-2 shrink-0">
+                <div>
+                    <h3 class="font-extrabold text-slate-800 text-xs"><i class="fa-solid fa-qrcode text-indigo-600 mr-1.5"></i>Cetak Stiker Label QR Massal (<span id="batch-qr-count-label">0</span> Paket)</h3>
+                    <p class="text-[8px] text-slate-500">Susunan grid otomatis siap cetak di kertas stiker A4 maupun printer thermal</p>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <select id="batch-qr-mode-select" onchange="window.renderBatchQrSheet()" class="px-2.5 py-1 rounded-xl border border-indigo-200 bg-indigo-50/70 text-indigo-800 font-bold text-[8.5px]">
+                        <option value="active">Paket Aktif (Belum Selesai)</option>
+                        <option value="today">Paket Hari Ini</option>
+                        <option value="selected">Paket yang Dicentang</option>
+                        <option value="all_visible">Semua Paket Tampil (Maks 24)</option>
+                    </select>
+                    <button type="button" onclick="window.closeBatchQrModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="overflow-y-auto flex-1 pr-1 bg-slate-100/70 p-3 rounded-2xl">
+                <div id="batch-qr-print-sheet" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-white p-3 rounded-xl"></div>
+            </div>
+            <div class="flex justify-end space-x-2 border-t pt-2 shrink-0">
+                <button type="button" onclick="window.closeBatchQrModal()" class="px-4 py-1.5 rounded-xl border font-bold text-[9.5px]">Tutup</button>
+                <button type="button" onclick="window.printBatchQrStickers()" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[9.5px] shadow flex items-center space-x-1.5"><i class="fa-solid fa-print"></i><span>Cetak Semua Stiker QR</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Template WhatsApp Modal -->
+    <div id="wa-template-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-[80] flex items-center justify-center p-3 hidden" onclick="window.closeWaTemplateModal()">
+        <div class="bg-white rounded-3xl max-w-md w-full p-4 shadow-2xl space-y-3" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center border-b pb-2">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-base"><i class="fa-brands fa-whatsapp"></i></div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-800 text-xs">Kirim Notifikasi WhatsApp Multi-Template</h3>
+                        <p id="wa-modal-recipient-info" class="text-[8.5px] text-slate-500 font-medium">Penerima: -</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeWaTemplateModal()" class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="block text-[8.5px] font-extrabold text-slate-600 uppercase">Pilih Template Pesan Cepat:</label>
+                <div class="grid grid-cols-2 gap-1.5 text-[8.5px]">
+                    <button type="button" onclick="window.selectWaTemplateType('arrived')" id="wa-tpl-btn-arrived" class="p-2 rounded-xl border text-left font-bold transition bg-emerald-50 border-emerald-400 text-emerald-900">
+                        <i class="fa-solid fa-box-open text-emerald-600 mr-1"></i>1. Tiba di Pos 3
+                    </button>
+                    <button type="button" onclick="window.selectWaTemplateType('delivering')" id="wa-tpl-btn-delivering" class="p-2 rounded-xl border text-left font-bold transition bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100">
+                        <i class="fa-solid fa-motorcycle text-sky-600 mr-1"></i>2. Sedang Diantar
+                    </button>
+                    <button type="button" onclick="window.selectWaTemplateType('cod')" id="wa-tpl-btn-cod" class="p-2 rounded-xl border text-left font-bold transition bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100">
+                        <i class="fa-solid fa-money-bill-wave text-rose-600 mr-1"></i>3. Tagihan COD
+                    </button>
+                    <button type="button" onclick="window.selectWaTemplateType('reminder')" id="wa-tpl-btn-reminder" class="p-2 rounded-xl border text-left font-bold transition bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100">
+                        <i class="fa-solid fa-bell text-amber-600 mr-1"></i>4. Pengingat Menginap
+                    </button>
+                    <button type="button" onclick="window.selectWaTemplateType('completed')" id="wa-tpl-btn-completed" class="col-span-2 p-2 rounded-xl border text-left font-bold transition bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100">
+                        <i class="fa-solid fa-circle-check text-teal-600 mr-1"></i>5. Konfirmasi Paket Telah Diterima (Bukti Serah Terima)
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <div class="flex justify-between items-center">
+                    <label class="block text-[8.5px] font-bold text-slate-700">Nomor WhatsApp Tujuan</label>
+                    <span class="text-[7.5px] text-slate-400">Otomatis format 628...</span>
+                </div>
+                <input type="tel" id="wa-modal-phone-input" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-[9.5px] font-mono font-bold text-emerald-700">
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-[8.5px] font-bold text-slate-700">Pratinjau & Edit Pesan WhatsApp</label>
+                <textarea id="wa-modal-message-input" rows="6" class="w-full p-2.5 rounded-xl border border-slate-200 text-[9px] leading-relaxed bg-slate-50 focus:bg-white focus:outline-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+                <button type="button" onclick="window.closeWaTemplateModal()" class="py-2 rounded-xl border font-bold text-[9.5px]">Batal</button>
+                <button type="button" onclick="window.executeSendWaMessage()" class="py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[9.5px] shadow-md flex items-center justify-center space-x-1.5">
+                    <i class="fa-brands fa-whatsapp text-xs"></i><span>Kirim ke WhatsApp</span>
+                </button>
             </div>
         </div>
     </div>
@@ -1506,7 +1631,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAnalytics, isSupported as isAnalyticsSupported } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, limit, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadString, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 
         // Silent log untuk menjaga kebersihan konsol browser
@@ -1618,7 +1744,12 @@
         document.getElementById('pwa-manifest-link').setAttribute('href', URL.createObjectURL(new Blob([JSON.stringify(manifestData)], {type: 'application/json'})));
 
         let appId = typeof __app_id !== 'undefined' ? __app_id : 'bns-kurir-realtime';
-        let db, auth, messaging, analytics;
+        let db, auth, storage, messaging, analytics;
+        let cloudQueryLimit = parseInt(localStorage.getItem('kurir_bns_cloud_limit') || '250', 10);
+        let _unsubPackages = null;
+        let _unsubAudit = null;
+        const _lastSyncedPkgHash = new Map();
+        let activeWaPkgId = null;
         const SECRET_API_KEY = "AIzaSyAKHy8RwHWARWawquTW9Tgdp2aqWZzt9HM";
         const FCM_VAPID_PUBLIC_KEY = "BCOpb_xB6OVOdRCpW6SKfofEsfQqI2RlKmAgcDbJfQHUeZKNjNB_3ShXUhXGqxrnfFZkFxbJvTzld00qQnuXiOQ";
 
@@ -3106,16 +3237,194 @@
             return `<span class="px-1.5 py-0.2 rounded text-[7.5px] font-semibold bg-indigo-50 text-indigo-700">Sisa ${formatDur(remainMin)}</span>`;
         };
 
+        // =====================================================================
+        // LACAK RESI CEPAT TANPA LOGIN (QUICK TRACK DI HALAMAN AUTH)
+        // =====================================================================
+        window.handleQuickTrackSearch = function() {
+            const q = (document.getElementById('quick-track-input')?.value || '').trim().toLowerCase();
+            const box = document.getElementById('quick-track-result-box');
+            if (!box) return;
+            if (!q || q.length < 2) {
+                box.classList.remove('hidden');
+                box.innerHTML = `<div class="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[8.5px] font-semibold">Ketik minimal 2 karakter (No. Resi, ID TRX, atau Nama Penerima).</div>`;
+                return;
+            }
+            const matches = packages.filter(p =>
+                String(p.id || '').toLowerCase().includes(q) ||
+                String(p.resi || '').toLowerCase().includes(q) ||
+                String(p.recipient || '').toLowerCase().includes(q) ||
+                String(getOrCreatePackagePin(p)).toLowerCase() === q
+            ).slice(0, 5);
+
+            box.classList.remove('hidden');
+            if (matches.length === 0) {
+                box.innerHTML = `<div class="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-[8.5px] font-semibold text-center"><i class="fa-solid fa-circle-xmark mr-1"></i>Tidak ditemukan paket dengan kata kunci "${escapeHtml(q)}".</div>`;
+                return;
+            }
+            box.innerHTML = matches.map(p => {
+                const stBadge = p.status === 'completed'
+                    ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-extrabold text-[7.5px]">✅ SUDAH DITERIMA</span>`
+                    : (p.status === 'delivering'
+                        ? `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-extrabold text-[7.5px]">🛵 SEDANG DIANTAR KURIR</span>`
+                        : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold text-[7.5px]">📦 MENUNGGU DI POS 3</span>`);
+                return `
+                <div class="p-2.5 rounded-xl bg-white border border-indigo-100 shadow-sm space-y-1 text-[8.5px] text-left">
+                    <div class="flex justify-between items-center gap-1 border-b pb-1">
+                        <span class="font-mono font-extrabold text-indigo-700">${escapeHtml(p.id)}</span>
+                        ${stBadge}
+                    </div>
+                    <div class="font-extrabold text-slate-900">${escapeHtml(p.recipient)} <span class="text-slate-500 font-normal">(${escapeHtml(p.role || '-')})</span></div>
+                    <div class="text-rose-600 font-bold"><i class="fa-solid fa-location-dot mr-1"></i>Tujuan: ${escapeHtml(p.destination)}</div>
+                    <div class="text-slate-600 flex flex-wrap justify-between gap-1 text-[8px]">
+                        <span>Resi: <strong class="font-mono">${escapeHtml(p.resi || '-')}</strong></span>
+                        <span>Kurir: <strong class="text-sky-700">${escapeHtml(p.courier || 'Antrian Pos 3')}</strong></span>
+                    </div>
+                    <div class="text-[7.5px] text-slate-400">Masuk: ${escapeHtml(p.timestamp || '-')} ${p.completedTimestamp ? '• Selesai: ' + escapeHtml(p.completedTimestamp) : ''}</div>
+                    ${(p.status === 'completed' && p.completionOption) ? `<div class="text-[8px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">${escapeHtml(p.completionOption)}</div>` : ''}
+                </div>`;
+            }).join('');
+        };
+
+        // =====================================================================
+        // MULTI-TEMPLATE WHATSAPP NOTIFICATION
+        // =====================================================================
+        function buildWaTemplateText(p, tplType) {
+            const pinCode = getOrCreatePackagePin(p);
+            const srcName = p.source === 'external' ? (p.vendor || 'Ekspedisi') : (p.senderInternal || 'Internal Sekolah');
+            const codLine = p.isCod ? `\n💰 *Tagihan COD:* *${p.codAmount || 'Bayar di Tempat'}*` : '';
+
+            if (tplType === 'delivering') {
+                return `Halo *${p.recipient}*,\nPaket Anda saat ini *SEDANG DIANTAR* oleh Kurir *${p.courier || 'BNS Express'}* menuju *${p.destination}*:\n\n📦 *ID:* ${p.id}\n🔖 *Resi / Pengirim:* ${p.resi || '-'} (${srcName})${codLine}\n🔐 *PIN Serah Terima:* *${pinCode}*\n\nMohon bersiap menerima paket. Terima kasih.`;
+            }
+            if (tplType === 'cod') {
+                return `Halo *${p.recipient}*,\nPemberitahuan *PAKET COD (Bayar di Tempat)* di *Kurir BNS Express Sekolah*:\n\n📦 *ID:* ${p.id}\n🔖 *Resi / Ekspedisi:* ${p.resi || '-'} (${srcName})\n📍 *Tujuan:* ${p.destination}\n💰 *Nominal Tagihan COD:* *${p.codAmount || 'Sesuai Tagihan Kurir'}*\n🔐 *PIN Konfirmasi Terima:* *${pinCode}*\n\nMohon menyiapkan pembayaran tunai pas atau konfirmasi ke Pos 3 / Kurir. Terima kasih.`;
+            }
+            if (tplType === 'reminder') {
+                return `Halo *${p.recipient}*,\nPengingat ramah dari *Pos Logistik BNS Express Sekolah*:\n\nPaket Anda masih tersimpan di Pos 3 dan menunggu diambil / diantar:\n📦 *ID:* ${p.id}\n🔖 *Resi:* ${p.resi || '-'} (${srcName})\n📍 *Tujuan:* ${p.destination}\n⏱️ *Waktu Masuk:* ${p.timestamp || '-'}\n🔐 *PIN Pengambilan:* *${pinCode}*\n\nSilakan konfirmasi atau ambil di Pos Piket. Terima kasih.`;
+            }
+            if (tplType === 'completed') {
+                return `Halo *${p.recipient}*,\nKonfirmasi bahwa paket Anda *TELAH DITERIMA*:\n\n📦 *ID:* ${p.id}\n🔖 *Resi:* ${p.resi || '-'}\n📍 *Tujuan:* ${p.destination}\n✅ *Keterangan Terima:* ${p.completionOption || 'Diterima'}\n🕒 *Waktu Selesai:* ${p.completedTimestamp || formatTimestampIndo(Date.now())}\n\nTerima kasih telah menggunakan layanan *Kurir BNS Express Sekolah*.`;
+            }
+            // Default: 'arrived' (Paket Tiba di Pos 3)
+            return `Halo *${p.recipient}*,\nInfo layanan *Kurir BNS Express Sekolah* — Paket Anda *TELAH TIBA di Pos 3*:\n\n📦 *ID:* ${p.id}\n🔖 *Resi / Pengirim:* ${p.resi || '-'} (${srcName})\n📍 *Tujuan:* ${p.destination}\n⚡ *Prioritas:* ${p.sla || '-'}${codLine}\n🔐 *PIN Konfirmasi Terima:* *${pinCode}*\n\nPaket akan segera dijadwalkan pengantarannya oleh kurir kami. Terima kasih.`;
+        }
+
+        window.selectWaTemplateType = function(tplType) {
+            const p = packages.find(item => String(item.id) === String(activeWaPkgId));
+            if (!p) return;
+            ['arrived', 'delivering', 'cod', 'reminder', 'completed'].forEach(t => {
+                const btn = document.getElementById(`wa-tpl-btn-${t}`);
+                if (!btn) return;
+                btn.className = (t === tplType ? 'col-span-' + (t === 'completed' ? '2 ' : '1 ') + 'p-2 rounded-xl border text-left font-extrabold transition bg-emerald-50 border-emerald-500 text-emerald-900 shadow-sm' : 'col-span-' + (t === 'completed' ? '2 ' : '1 ') + 'p-2 rounded-xl border text-left font-bold transition bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100');
+            });
+            const msgInput = document.getElementById('wa-modal-message-input');
+            if (msgInput) msgInput.value = buildWaTemplateText(p, tplType);
+        };
+
         window.sendWhatsAppNotification = function(pkgId) {
             const p = packages.find(item => String(item.id) === String(pkgId));
             if (!p) return;
+            activeWaPkgId = p.id;
             let phone = (p.phone || '081234567801').replace(/\D/g, '');
             if (phone.startsWith('0')) phone = '62' + phone.slice(1);
-            const pinCode = getOrCreatePackagePin(p);
-            const statusLabel = p.status === 'completed' ? `SUDAH DITERIMA (${p.completionOption || 'Selesai'})` : (p.status === 'delivering' ? `SEDANG DIANTAR oleh Kurir ${p.courier}` : `TELAH TIBA di Pos Logistik Sekolah`);
-            const pinLine = p.status === 'completed' ? '' : `\n🔐 *PIN Konfirmasi Terima:* *${pinCode}*`;
-            const text = `Halo *${p.recipient}*,\nInfo layanan *Kurir BNS Express Sekolah*:\n\n📦 *ID:* ${p.id}\n🔖 *Resi:* ${p.resi || '-'}\n📍 *Tujuan:* ${p.destination}\n⚡ *Status:* ${statusLabel}${pinLine}\n\nTerima kasih.`;
+            const phoneEl = document.getElementById('wa-modal-phone-input');
+            if (phoneEl) phoneEl.value = phone;
+            const infoEl = document.getElementById('wa-modal-recipient-info');
+            if (infoEl) infoEl.innerText = `${p.recipient} (${p.destination}) • ${p.id}`;
+
+            const autoType = p.status === 'completed'
+                ? 'completed'
+                : (p.isCod ? 'cod' : (p.status === 'delivering' ? 'delivering' : 'arrived'));
+            window.selectWaTemplateType(autoType);
+            document.getElementById('wa-template-modal')?.classList.remove('hidden');
+        };
+
+        window.closeWaTemplateModal = function() {
+            document.getElementById('wa-template-modal')?.classList.add('hidden');
+        };
+
+        window.executeSendWaMessage = function() {
+            let phone = (document.getElementById('wa-modal-phone-input')?.value || '').replace(/\D/g, '');
+            if (phone.startsWith('0')) phone = '62' + phone.slice(1);
+            const text = (document.getElementById('wa-modal-message-input')?.value || '').trim();
+            if (!phone || !text) {
+                showToast('Nomor WhatsApp dan isi pesan tidak boleh kosong!', 'error');
+                return;
+            }
+            window.closeWaTemplateModal();
             window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        };
+
+        // =====================================================================
+        // CETAK STIKER QR MASSAL (BATCH PRINT QR)
+        // =====================================================================
+        window.openBatchQrModal = function(sourceView = 'petugas') {
+            const modeSelect = document.getElementById('batch-qr-mode-select');
+            if (modeSelect) {
+                if (sourceView === 'admin' && selectedAdminPkgIds.size > 0) {
+                    modeSelect.value = 'selected';
+                } else {
+                    modeSelect.value = 'active';
+                }
+            }
+            window.renderBatchQrSheet();
+            document.getElementById('batch-qr-modal')?.classList.remove('hidden');
+        };
+
+        window.closeBatchQrModal = function() {
+            document.getElementById('batch-qr-modal')?.classList.add('hidden');
+        };
+
+        window.renderBatchQrSheet = function() {
+            const mode = document.getElementById('batch-qr-mode-select')?.value || 'active';
+            let targetList = [];
+            if (mode === 'selected') {
+                targetList = packages.filter(p => selectedAdminPkgIds.has(String(p.id)) || selectedCourierPkgIds.has(String(p.id)));
+                if (targetList.length === 0) targetList = packages.filter(p => p.status !== 'completed').slice(0, 12);
+            } else if (mode === 'today') {
+                targetList = packages.filter(p => doesPackageMatchPeriod(p, 'today')).slice(0, 24);
+            } else if (mode === 'all_visible') {
+                targetList = packages.slice(0, 24);
+            } else {
+                targetList = packages.filter(p => p.status !== 'completed').slice(0, 24);
+            }
+
+            const countLabel = document.getElementById('batch-qr-count-label');
+            if (countLabel) countLabel.innerText = targetList.length;
+
+            const sheet = document.getElementById('batch-qr-print-sheet');
+            if (!sheet) return;
+            if (targetList.length === 0) {
+                sheet.innerHTML = `<div class="col-span-3 text-center py-8 text-slate-400 text-xs">Tidak ada paket pada kategori ini untuk dicetak.</div>`;
+                return;
+            }
+            sheet.innerHTML = targetList.map(p => {
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(p.resi || p.id)}`;
+                const pin = getOrCreatePackagePin(p);
+                return `
+                <div class="border-2 border-dashed border-slate-800 rounded-xl p-2.5 text-center space-y-1 bg-white text-slate-900 break-inside-avoid">
+                    <div class="text-[8px] font-extrabold uppercase text-indigo-800 border-b border-slate-300 pb-0.5">KURIR BNS EXPRESS - SEKOLAH</div>
+                    <div class="flex items-center justify-center py-0.5">
+                        <img src="${qrUrl}" alt="QR" class="w-20 h-20 mx-auto border p-0.5 rounded">
+                    </div>
+                    <div class="font-mono font-extrabold text-[9px] text-slate-900">${escapeHtml(p.id)}</div>
+                    <div class="font-mono text-[7.5px] text-slate-500">Resi: ${escapeHtml(p.resi || '-')}</div>
+                    <div class="border-t border-slate-300 pt-1 text-left text-[8px] space-y-0.5 leading-snug">
+                        <div class="truncate"><span>Kepada:</span> <strong>${escapeHtml(p.recipient)}</strong> (${escapeHtml(p.role || '-')})</div>
+                        <div class="truncate"><span>Tujuan:</span> <strong class="text-rose-700">${escapeHtml(p.destination)}</strong></div>
+                        <div class="flex justify-between items-center">
+                            <span>PIN: <strong class="font-mono text-emerald-700">${escapeHtml(pin)}</strong></span>
+                            ${p.isCod ? `<span class="px-1 rounded bg-rose-100 text-rose-800 font-extrabold text-[7px]">COD: ${escapeHtml(p.codAmount || 'Ya')}</span>` : `<span class="text-[7px] font-bold uppercase text-indigo-700">${escapeHtml(p.category || 'barang')}</span>`}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        };
+
+        window.printBatchQrStickers = function() {
+            document.body.classList.add('printing-batch-qr');
+            window.print();
+            setTimeout(() => document.body.classList.remove('printing-batch-qr'), 500);
         };
 
         window.openQrLabelModal = function(pkgId) {
@@ -3362,6 +3671,7 @@
                     experimentalForceLongPolling: true,
                     ignoreUndefinedProperties: true
                 });
+                try { storage = getStorage(app); } catch (e) {}
                 auth = getAuth(app);
                 isMessagingSupported().then(supported => {
                     if (supported) {
@@ -3390,10 +3700,53 @@
             }
         }
 
+        // Upload foto Base64 ke Firebase Cloud Storage (kurir-sekolah-app.firebasestorage.app) dengan fallback otomatis jika offline
+        async function uploadPhotoToFirebaseStorage(dataUrl, pkgId, slotName = 'physical') {
+            if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return dataUrl;
+            if (!storage) return dataUrl;
+            try {
+                const filePath = `bns_storage/${appId}/photos/${String(pkgId)}_${slotName}`;
+                const fileRef = storageRef(storage, filePath);
+                const uploadPromise = (async () => {
+                    await uploadString(fileRef, dataUrl, 'data_url');
+                    return await getDownloadURL(fileRef);
+                })();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Storage timeout')), 4500));
+                const downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
+                return downloadUrl || dataUrl;
+            } catch (e) {
+                // Fallback aman ke string terkompresi jika Storage Rules belum aktif atau sedang offline
+                return dataUrl;
+            }
+        }
+
+        async function deletePhotoFromFirebaseStorage(pkgId) {
+            if (!storage || !pkgId) return;
+            for (const slot of ['physical', 'proof', 'signature']) {
+                try {
+                    const fileRef = storageRef(storage, `bns_storage/${appId}/photos/${String(pkgId)}_${slot}`);
+                    await deleteObject(fileRef).catch(() => {});
+                } catch (e) {}
+            }
+        }
+
+        window.handleCloudQueryLimitChange = function(val) {
+            cloudQueryLimit = parseInt(val, 10) || 0;
+            try { localStorage.setItem('kurir_bns_cloud_limit', String(cloudQueryLimit)); } catch (e) {}
+            setupRealtimeSync();
+            showToast(cloudQueryLimit > 0 ? `Optimasi Kuota Cloud diset ke maks ${cloudQueryLimit} paket.` : 'Sinkronisasi diset ke Semua Paket.');
+        };
+
         function setupRealtimeSync() {
             if (!db) return;
             try {
-                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'packages_col'), (snapshot) => {
+                if (_unsubPackages) { try { _unsubPackages(); } catch (e) {} _unsubPackages = null; }
+                if (_unsubAudit) { try { _unsubAudit(); } catch (e) {} _unsubAudit = null; }
+
+                const pkgColRef = collection(db, 'artifacts', appId, 'public', 'data', 'packages_col');
+                const pkgQueryRef = cloudQueryLimit > 0 ? query(pkgColRef, limit(cloudQueryLimit)) : pkgColRef;
+
+                _unsubPackages = onSnapshot(pkgQueryRef, (snapshot) => {
                     const cloudPkgs = [];
                     snapshot.forEach(docSnap => {
                         const raw = docSnap.data() || {};
@@ -3507,7 +3860,9 @@
                     });
                 }, () => {});
 
-                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'audit_logs_col'), (snapshot) => {
+                const auditColRef = collection(db, 'artifacts', appId, 'public', 'data', 'audit_logs_col');
+                const auditQueryRef = query(auditColRef, limit(100));
+                _unsubAudit = onSnapshot(auditQueryRef, (snapshot) => {
                     const cloudLogs = [];
                     snapshot.forEach(docSnap => cloudLogs.push(docSnap.data()));
                     if (cloudLogs.length > 0) {
@@ -3532,9 +3887,29 @@
         async function syncPackageToFirebase(pkgObj) {
             if (!pkgObj) return false;
             deletedPkgBlacklist.delete(String(pkgObj.id));
+            // Simpan salinan foto ke IndexedDB lokal terlebih dahulu
+            savePackagePhotosToIdb(pkgObj);
             saveLocalCache();
             if (!db) return false;
             try {
+                // Coba unggah foto Base64 ke Firebase Storage agar dokumen Firestore hemat kuota & cepat
+                if (pkgObj.physicalPhotoUrl && pkgObj.physicalPhotoUrl.startsWith('data:image/')) {
+                    pkgObj.physicalPhotoUrl = await uploadPhotoToFirebaseStorage(pkgObj.physicalPhotoUrl, pkgObj.id, 'physical');
+                }
+                if (pkgObj.proofPhotoUrl && pkgObj.proofPhotoUrl.startsWith('data:image/')) {
+                    pkgObj.proofPhotoUrl = await uploadPhotoToFirebaseStorage(pkgObj.proofPhotoUrl, pkgObj.id, 'proof');
+                }
+                if (pkgObj.signatureDataUrl && pkgObj.signatureDataUrl.startsWith('data:image/')) {
+                    pkgObj.signatureDataUrl = await uploadPhotoToFirebaseStorage(pkgObj.signatureDataUrl, pkgObj.id, 'signature');
+                }
+
+                // Deduplikasi Write: jangan kirim ulang jika state dokumen identik
+                const stateKey = JSON.stringify([pkgObj.status, pkgObj.courier, pkgObj.recipient, pkgObj.destination, pkgObj.notes, pkgObj.completionOption, pkgObj.exceptionStatus, Boolean(pkgObj.physicalPhotoUrl), Boolean(pkgObj.proofPhotoUrl)]);
+                if (_lastSyncedPkgHash.get(String(pkgObj.id)) === stateKey) {
+                    return true;
+                }
+                _lastSyncedPkgHash.set(String(pkgObj.id), stateKey);
+
                 setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'packages_col', String(pkgObj.id)), pkgObj, { merge: true }).catch(() => {});
                 return true;
             } catch (e) { return false; }
@@ -3549,6 +3924,8 @@
             selectedAdminPkgIds.delete(targetId);
             selectedCourierPkgIds.delete(targetId);
             deletePackagePhotosFromIdb(targetId);
+            deletePhotoFromFirebaseStorage(targetId);
+            _lastSyncedPkgHash.delete(targetId);
             saveLocalCache();
 
             if (db) {
@@ -3562,6 +3939,8 @@
         }
 
         window.openBackupModal = function() {
+            const limitSel = document.getElementById('cloud-query-limit-select');
+            if (limitSel) limitSel.value = String(cloudQueryLimit);
             const photoCount = packages.filter(p => p.physicalPhotoUrl || p.proofPhotoUrl).length;
             const badge = document.getElementById('storage-photo-count-badge');
             if (badge) badge.innerText = `${photoCount} Paket Berfoto`;
@@ -3579,6 +3958,7 @@
                 for (const p of completedWithPhotos) {
                     p.physicalPhotoUrl = null; p.proofPhotoUrl = null;
                     await deletePackagePhotosFromIdb(p.id);
+                    await deletePhotoFromFirebaseStorage(p.id);
                     await syncPackageToFirebase(p);
                 }
                 window.openBackupModal();
